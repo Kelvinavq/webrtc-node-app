@@ -1,65 +1,64 @@
-const express = require('express')
-const http = require('http')
-const { Server } = require('socket.io')
-
-const app = express()
-const server = http.createServer(app)
-const io = new Server(server)
-
-app.use('/', express.static('public'))
+// Servidor
+const io = require('socket.io')(server)
+const rooms = {} // Para almacenar las salas y sus usuarios
 
 io.on('connection', (socket) => {
+  console.log('New client connected:', socket.id)
+
   socket.on('join', (roomId) => {
-    const selectedRoom = io.sockets.adapter.rooms.get(roomId)
-    const numberOfClients = selectedRoom ? selectedRoom.size : 0
-
-    if (numberOfClients === 0) {
-      console.log(`Creating room ${roomId} and emitting room_created socket event`)
-      socket.join(roomId)
-      socket.emit('room_created', roomId)
-    } else if (numberOfClients < 4) {  // Ajusta el límite según tus necesidades
-      console.log(`Joining room ${roomId} and emitting room_joined socket event`)
-      socket.join(roomId)
-      socket.emit('room_joined', roomId)
-      // Notificar a todos los demás clientes en la sala de que se ha unido un nuevo cliente
-      socket.to(roomId).emit('new_user_joined', { userId: socket.id })
-    } else {
-      console.log(`Can't join room ${roomId}, emitting full_room socket event`)
-      socket.emit('full_room', roomId)
+    if (!rooms[roomId]) {
+      rooms[roomId] = []
     }
-  })
 
-  socket.on('start_call', (roomId) => {
-    console.log(`Broadcasting start_call event to peers in room ${roomId}`)
-    socket.to(roomId).emit('start_call')
-  })
+    if (rooms[roomId].length >= 2) { // Por ejemplo, limitando a 2 usuarios por sala
+      socket.emit('full_room')
+      return
+    }
 
-  socket.on('webrtc_offer', (event) => {
-    console.log(`Broadcasting webrtc_offer event to peers in room ${event.roomId}`)
-    socket.to(event.roomId).emit('webrtc_offer', event)
-  })
+    socket.join(roomId)
+    rooms[roomId].push(socket.id)
 
-  socket.on('webrtc_answer', (event) => {
-    console.log(`Broadcasting webrtc_answer event to peers in room ${event.roomId}`)
-    socket.to(event.roomId).emit('webrtc_answer', event)
-  })
+    if (rooms[roomId].length === 1) {
+      socket.emit('room_created')
+    } else {
+      io.to(roomId).emit('room_joined')
+    }
 
-  socket.on('webrtc_ice_candidate', (event) => {
-    console.log(`Broadcasting webrtc_ice_candidate event to peers in room ${event.roomId}`)
-    socket.to(event.roomId).emit('webrtc_ice_candidate', event)
-  })
+    socket.on('start_call', () => {
+      socket.broadcast.to(roomId).emit('start_call')
+    })
 
-  socket.on('disconnect', () => {
-    console.log('User disconnected')
-    // Notificar a todos los demás clientes en la sala de que un usuario se ha desconectado
-    io.sockets.adapter.rooms.forEach((_, roomId) => {
-      socket.to(roomId).emit('user_disconnected', { userId: socket.id })
+    socket.on('webrtc_offer', (data) => {
+      socket.broadcast.to(data.roomId).emit('webrtc_offer', {
+        userId: socket.id,
+        sdp: data.sdp
+      })
+    })
+
+    socket.on('webrtc_answer', (data) => {
+      socket.broadcast.to(data.roomId).emit('webrtc_answer', {
+        userId: socket.id,
+        sdp: data.sdp
+      })
+    })
+
+    socket.on('webrtc_ice_candidate', (data) => {
+      socket.broadcast.to(data.roomId).emit('webrtc_ice_candidate', {
+        userId: socket.id,
+        candidate: data.candidate
+      })
+    })
+
+    socket.on('disconnect', () => {
+      console.log('Client disconnected:', socket.id)
+      // Eliminar el usuario de la sala y notificar a los demás usuarios
+      Object.keys(rooms).forEach(roomId => {
+        rooms[roomId] = rooms[roomId].filter(id => id !== socket.id)
+        if (rooms[roomId].length === 0) {
+          delete rooms[roomId]
+        }
+      })
+      io.emit('user_disconnected', { userId: socket.id })
     })
   })
-})
-
-// START THE SERVER =================================================================
-const port = process.env.PORT || 3000
-server.listen(port, () => {
-  console.log(`Express server listening on port ${port}`)
 })

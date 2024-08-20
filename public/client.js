@@ -5,20 +5,18 @@ const connectButton = document.getElementById('connect-button')
 
 const videoChatContainer = document.getElementById('video-chat-container')
 const localVideoComponent = document.getElementById('local-video')
-const remoteVideoComponent = document.getElementById('remote-video')
+const remoteVideosContainer = document.createElement('div')
+videoChatContainer.appendChild(remoteVideosContainer)
 
 // Variables.
 const socket = io()
-// const socket = io('https://webrtc-node-app-tgki.onrender.com');
 
 const mediaConstraints = {
   audio: true,
   video: { width: 1280, height: 720 },
 }
 let localStream
-let remoteStream
-let isRoomCreator
-let rtcPeerConnection // Connection between the local device and the remote peer.
+let peerConnections = {} // Almacenar conexiones de pares
 let roomId
 
 // Free public STUN servers provided by Google.
@@ -40,80 +38,127 @@ connectButton.addEventListener('click', () => {
 // SOCKET EVENT CALLBACKS =====================================================
 socket.on('room_created', async () => {
   console.log('Socket event callback: room_created')
-
   await setLocalStream(mediaConstraints)
-  isRoomCreator = true
 })
 
 socket.on('room_joined', async () => {
   console.log('Socket event callback: room_joined')
-
   await setLocalStream(mediaConstraints)
   socket.emit('start_call', roomId)
 })
 
 socket.on('full_room', () => {
   console.log('Socket event callback: full_room')
-
   alert('The room is full, please try another one')
+})
+
+socket.on('new_user_joined', async (event) => {
+  console.log('New user joined:', event)
+  // Crear una conexión de pares para el nuevo usuario
+  await createPeerConnection(event.userId)
+})
+
+socket.on('user_disconnected', (event) => {
+  console.log('User disconnected:', event.userId)
+  // Manejar la desconexión del usuario (eliminar su video, etc.)
+  const remoteVideo = document.getElementById(event.userId)
+  if (remoteVideo) {
+    remoteVideo.remove()
+  }
+  if (peerConnections[event.userId]) {
+    peerConnections[event.userId].close()
+    delete peerConnections[event.userId]
+  }
 })
 
 socket.on('start_call', async () => {
   console.log('Socket event callback: start_call')
-
-  if (isRoomCreator) {
-    rtcPeerConnection = new RTCPeerConnection(iceServers)
-    addLocalTracks(rtcPeerConnection)
-    rtcPeerConnection.ontrack = setRemoteStream
-    rtcPeerConnection.onicecandidate = sendIceCandidate
-    await createOffer(rtcPeerConnection)
-  }
+  await createPeerConnection()
 })
 
 socket.on('webrtc_offer', async (event) => {
-  console.log('Received webrtc_offer:', event);
-
-  if (!isRoomCreator) {
-    rtcPeerConnection = new RTCPeerConnection(iceServers)
-    addLocalTracks(rtcPeerConnection)
-    rtcPeerConnection.ontrack = setRemoteStream
-    rtcPeerConnection.onicecandidate = sendIceCandidate
-    rtcPeerConnection.setRemoteDescription(new RTCSessionDescription(event))
-    await createAnswer(rtcPeerConnection)
+  console.log('Received webrtc_offer:', event)
+  const { userId } = event
+  if (!peerConnections[userId]) {
+    await createPeerConnection(userId)
   }
+  const rtcPeerConnection = peerConnections[userId]
+  rtcPeerConnection.setRemoteDescription(new RTCSessionDescription(event.sdp))
+  await createAnswer(rtcPeerConnection, userId)
 })
 
 socket.on('webrtc_answer', (event) => {
-  console.log('Received webrtc_answer:', event);
-
-  rtcPeerConnection.setRemoteDescription(new RTCSessionDescription(event))
+  console.log('Received webrtc_answer:', event)
+  const { userId } = event
+  peerConnections[userId].setRemoteDescription(new RTCSessionDescription(event.sdp))
 })
 
 socket.on('webrtc_ice_candidate', (event) => {
-  console.log('Received webrtc_ice_candidate:', event);
-
-  // ICE candidate configuration.
-  const candidate = new RTCIceCandidate({
-    sdpMLineIndex: event.label,
-    candidate: event.candidate,
-  })
-  rtcPeerConnection.addIceCandidate(candidate)
+  console.log('Received webrtc_ice_candidate:', event)
+  const { userId, candidate } = event
+  if (peerConnections[userId]) {
+    const rtcIceCandidate = new RTCIceCandidate(candidate)
+    peerConnections[userId].addIceCandidate(rtcIceCandidate)
+  }
 })
 
-// FUNCTIONS ==================================================================
-function joinRoom(room) {
-  if (room === '') {
-    alert('Please type a room ID')
-  } else {
-    roomId = room
-    socket.emit('join', room)
-    showVideoConference()
+async function createPeerConnection(userId) {
+  const rtcPeerConnection = new RTCPeerConnection(iceServers)
+  peerConnections[userId] = rtcPeerConnection
+
+  rtcPeerConnection.ontrack = (event) => {
+    const remoteStream = event.streams[0]
+    if (remoteStream) {
+      let remoteVideo = document.getElementById(userId)
+      if (!remoteVideo) {
+        remoteVideo = document.createElement('video')
+        remoteVideo.id = userId
+        remoteVideo.autoplay = true
+        remoteVideo.playsInline = true
+        remoteVideosContainer.appendChild(remoteVideo)
+      }
+      remoteVideo.srcObject = remoteStream
+    }
+  }
+
+  rtcPeerConnection.onicecandidate = (event) => {
+    if (event.candidate) {
+      socket.emit('webrtc_ice_candidate', {
+        userId,
+        candidate: event.candidate,
+        roomId
+      })
+    }
+  }
+
+  addLocalTracks(rtcPeerConnection)
+  return rtcPeerConnection
+}
+
+async function addLocalTracks(rtcPeerConnection) {
+  localStream.getTracks().forEach((track) => {
+    rtcPeerConnection.addTrack(track, localStream)
+  })
+}
+
+async function createOffer(rtcPeerConnection, userId) {
+  try {
+    const sessionDescription = await rtcPeerConnection.createOffer()
+    await rtcPeerConnection.setLocalDescription(sessionDescription)
+    socket.emit('webrtc_offer', { type: 'webrtc_offer', sdp: sessionDescription, roomId, userId })
+  } catch (error) {
+    console.error('Error creating offer:', error)
   }
 }
 
-function showVideoConference() {
-  roomSelectionContainer.style.display = 'none'
-  videoChatContainer.style.display = 'block'
+async function createAnswer(rtcPeerConnection, userId) {
+  try {
+    const sessionDescription = await rtcPeerConnection.createAnswer()
+    await rtcPeerConnection.setLocalDescription(sessionDescription)
+    socket.emit('webrtc_answer', { type: 'webrtc_answer', sdp: sessionDescription, roomId, userId })
+  } catch (error) {
+    console.error('Error creating answer:', error)
+  }
 }
 
 async function setLocalStream(mediaConstraints) {
@@ -125,53 +170,11 @@ async function setLocalStream(mediaConstraints) {
   }
 }
 
-function addLocalTracks(rtcPeerConnection) {
-  localStream.getTracks().forEach((track) => {
-    rtcPeerConnection.addTrack(track, localStream);
-  });
-}
-
-async function createOffer(rtcPeerConnection) {
-  try {
-    const sessionDescription = await rtcPeerConnection.createOffer();
-    await rtcPeerConnection.setLocalDescription(sessionDescription);
-    socket.emit('webrtc_offer', { type: 'webrtc_offer', sdp: sessionDescription, roomId });
-  } catch (error) {
-    console.error('Error creating offer:', error);
-  }
-}
-
-async function createAnswer(rtcPeerConnection) {
-  try {
-    const sessionDescription = await rtcPeerConnection.createAnswer();
-    await rtcPeerConnection.setLocalDescription(sessionDescription);
-    socket.emit('webrtc_answer', { type: 'webrtc_answer', sdp: sessionDescription, roomId });
-  } catch (error) {
-    console.error('Error creating answer:', error);
-  }
-}
-
-
-function setRemoteStream(event) {
-  const remoteStream = event.streams[0];
-  if (remoteStream) {
-    remoteVideoComponent.srcObject = remoteStream;
-    console.log('Remote stream set:', remoteStream);
+function joinRoom(room) {
+  if (room === '') {
+    alert('Please type a room ID')
   } else {
-    console.error('No remote stream found');
+    roomId = room
+    socket.emit('join', roomId)
   }
 }
-
-
-
-function sendIceCandidate(event) {
-  if (event.candidate) {
-    console.log('Sending ICE candidate:', event.candidate);
-    socket.emit('webrtc_ice_candidate', {
-      roomId,
-      label: event.candidate.sdpMLineIndex,
-      candidate: event.candidate.candidate,
-    });
-  }
-}
-

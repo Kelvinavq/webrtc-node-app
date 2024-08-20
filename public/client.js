@@ -126,7 +126,6 @@ async function createPeerConnection(userId) {
       remoteVideo.srcObject = remoteStream
     }
   }
-  
 
   rtcPeerConnection.onicecandidate = (event) => {
     if (event.candidate) {
@@ -138,15 +137,27 @@ async function createPeerConnection(userId) {
     }
   }
 
-  addLocalTracks(rtcPeerConnection)
+  // Verifica si localStream está definido antes de agregar pistas
+  if (localStream) {
+    addLocalTracks(rtcPeerConnection)
+  } else {
+    console.error('Local stream is not set')
+  }
+  
   return rtcPeerConnection
 }
 
+
 async function addLocalTracks(rtcPeerConnection) {
-  localStream.getTracks().forEach((track) => {
-    rtcPeerConnection.addTrack(track, localStream)
-  })
+  if (localStream) {
+    localStream.getTracks().forEach((track) => {
+      rtcPeerConnection.addTrack(track, localStream)
+    })
+  } else {
+    console.error('Local stream is not available')
+  }
 }
+
 
 async function createOffer(rtcPeerConnection, userId) {
   try {
@@ -172,11 +183,12 @@ async function setLocalStream(mediaConstraints) {
   try {
     localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints)
     localVideoComponent.srcObject = localStream
-    console.log('Local stream set successfully')
+    console.log('Local stream set successfully:', localStream)
   } catch (error) {
     console.error('Could not get user media', error)
   }
 }
+
 
 
 function joinRoom(room) {

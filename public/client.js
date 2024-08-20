@@ -153,12 +153,13 @@ async function createAnswer(rtcPeerConnection) {
 
 
 function setRemoteStream(event) {
-  console.log('Setting remote stream:', event.streams[0]);
-  remoteVideoComponent.srcObject = event.streams[0];
-  remoteStream = event.stream;
-
-  console.log(remoteStream.getVideoTracks());
-
+  const remoteStream = event.streams[0];
+  if (remoteStream) {
+    remoteVideoComponent.srcObject = remoteStream;
+    console.log('Remote stream set:', remoteStream);
+  } else {
+    console.error('No remote stream found');
+  }
 }
 
 

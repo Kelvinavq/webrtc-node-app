@@ -9,7 +9,7 @@ const remoteVideoComponent = document.getElementById('remote-video')
 
 // Variables.
 // const socket = io()
-const socket = io('https://webrtc-node-app-eight.vercel.app/');
+const socket = io('https://webrtc-node-qq2jse0i9-kelvinavqs-projects.vercel.app');
 const mediaConstraints = {
   audio: true,
   video: { width: 1280, height: 720 },

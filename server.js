@@ -1,10 +1,16 @@
-// Servidor
-const io = require('socket.io')(server)
-const rooms = {} // Para almacenar las salas y sus usuarios
+const express = require('express')
+const http = require('http')
+const { Server } = require('socket.io')
+
+const app = express()
+const server = http.createServer(app)
+const io = new Server(server)
+
+app.use('/', express.static('public'))
+const rooms = {} 
+
 
 io.on('connection', (socket) => {
-  console.log('New client connected:', socket.id)
-
   socket.on('join', (roomId) => {
     if (!rooms[roomId]) {
       rooms[roomId] = []
@@ -61,4 +67,10 @@ io.on('connection', (socket) => {
       io.emit('user_disconnected', { userId: socket.id })
     })
   })
+})
+
+// START THE SERVER =================================================================
+const port = process.env.PORT || 3000
+server.listen(port, () => {
+  console.log(`Express server listening on port ${port}`)
 })

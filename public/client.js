@@ -31,9 +31,15 @@ const iceServers = {
 }
 
 // BUTTON LISTENER ============================================================
-connectButton.addEventListener('click', () => {
-  joinRoom(roomInput.value)
+connectButton.addEventListener('click', async () => {
+  if (roomInput.value) {
+    await setLocalStream(mediaConstraints) // Asegúrate de que esto se complete
+    joinRoom(roomInput.value) // Luego, llama a joinRoom
+  } else {
+    alert('Please type a room ID')
+  }
 })
+
 
 // SOCKET EVENT CALLBACKS =====================================================
 socket.on('room_created', async () => {
@@ -47,10 +53,10 @@ socket.on('room_created', async () => {
 socket.on('room_joined', async () => {
   console.log('Socket event callback: room_joined')
   await setLocalStream(mediaConstraints)
-  videoChatContainer.style.display = 'block'
-  roomSelectionContainer.style.display = 'none'
+  console.log('Local stream set:', localStream)
   socket.emit('start_call', roomId)
 })
+
 
 socket.on('full_room', () => {
   console.log('Socket event callback: full_room')
@@ -113,7 +119,6 @@ async function createPeerConnection(userId) {
 
   rtcPeerConnection.ontrack = (event) => {
     const remoteStream = event.streams[0]
-    console.log('Received remote stream:', remoteStream)
     if (remoteStream) {
       let remoteVideo = document.getElementById(userId)
       if (!remoteVideo) {
@@ -137,15 +142,16 @@ async function createPeerConnection(userId) {
     }
   }
 
-  // Verifica si localStream está definido antes de agregar pistas
+  // Asegúrate de que localStream esté disponible antes de agregar pistas
   if (localStream) {
     addLocalTracks(rtcPeerConnection)
   } else {
-    console.error('Local stream is not set')
+    console.error('Local stream is not available at createPeerConnection')
   }
   
   return rtcPeerConnection
 }
+
 
 
 async function addLocalTracks(rtcPeerConnection) {

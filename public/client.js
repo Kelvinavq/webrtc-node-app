@@ -39,14 +39,16 @@ connectButton.addEventListener('click', () => {
 socket.on('room_created', async () => {
   console.log('Socket event callback: room_created')
   await setLocalStream(mediaConstraints)
-  videoChatContainer.style.display = 'block' // Muestra el contenedor de video
-  roomSelectionContainer.style.display = 'none' // Oculta el formulario de entrada de sala
+  videoChatContainer.style.display = 'block'
+  roomSelectionContainer.style.display = 'none'
 })
 
 
 socket.on('room_joined', async () => {
   console.log('Socket event callback: room_joined')
   await setLocalStream(mediaConstraints)
+  videoChatContainer.style.display = 'block'
+  roomSelectionContainer.style.display = 'none'
   socket.emit('start_call', roomId)
 })
 
@@ -111,6 +113,7 @@ async function createPeerConnection(userId) {
 
   rtcPeerConnection.ontrack = (event) => {
     const remoteStream = event.streams[0]
+    console.log('Received remote stream:', remoteStream)
     if (remoteStream) {
       let remoteVideo = document.getElementById(userId)
       if (!remoteVideo) {
@@ -123,6 +126,7 @@ async function createPeerConnection(userId) {
       remoteVideo.srcObject = remoteStream
     }
   }
+  
 
   rtcPeerConnection.onicecandidate = (event) => {
     if (event.candidate) {

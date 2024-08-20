@@ -8,7 +8,8 @@ const localVideoComponent = document.getElementById('local-video')
 const remoteVideoComponent = document.getElementById('remote-video')
 
 // Variables.
-const socket = io()
+// const socket = io()
+const socket = io('https://mi-servidor-websocket.com');
 const mediaConstraints = {
   audio: true,
   video: { width: 1280, height: 720 },

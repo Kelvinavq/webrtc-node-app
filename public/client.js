@@ -39,7 +39,10 @@ connectButton.addEventListener('click', () => {
 socket.on('room_created', async () => {
   console.log('Socket event callback: room_created')
   await setLocalStream(mediaConstraints)
+  videoChatContainer.style.display = 'block' // Muestra el contenedor de video
+  roomSelectionContainer.style.display = 'none' // Oculta el formulario de entrada de sala
 })
+
 
 socket.on('room_joined', async () => {
   console.log('Socket event callback: room_joined')
@@ -165,10 +168,12 @@ async function setLocalStream(mediaConstraints) {
   try {
     localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints)
     localVideoComponent.srcObject = localStream
+    console.log('Local stream set successfully')
   } catch (error) {
     console.error('Could not get user media', error)
   }
 }
+
 
 function joinRoom(room) {
   if (room === '') {

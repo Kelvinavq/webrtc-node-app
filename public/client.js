@@ -133,39 +133,34 @@ function addLocalTracks(rtcPeerConnection) {
 
 async function createOffer(rtcPeerConnection) {
   try {
-    const sessionDescription = await rtcPeerConnection.createOffer()
-    rtcPeerConnection.setLocalDescription(sessionDescription)
-    
-    socket.emit('webrtc_offer', {
-      type: 'webrtc_offer',
-      sdp: sessionDescription,
-      roomId,
-    })
+    const sessionDescription = await rtcPeerConnection.createOffer();
+    await rtcPeerConnection.setLocalDescription(sessionDescription);
+    socket.emit('webrtc_offer', { type: 'webrtc_offer', sdp: sessionDescription, roomId });
   } catch (error) {
-    console.error(error)
+    console.error('Error creating offer:', error);
   }
 }
 
 async function createAnswer(rtcPeerConnection) {
   try {
-    const sessionDescription = await rtcPeerConnection.createAnswer()
-    rtcPeerConnection.setLocalDescription(sessionDescription)
-    
-    socket.emit('webrtc_answer', {
-      type: 'webrtc_answer',
-      sdp: sessionDescription,
-      roomId,
-    })
+    const sessionDescription = await rtcPeerConnection.createAnswer();
+    await rtcPeerConnection.setLocalDescription(sessionDescription);
+    socket.emit('webrtc_answer', { type: 'webrtc_answer', sdp: sessionDescription, roomId });
   } catch (error) {
-    console.error(error)
+    console.error('Error creating answer:', error);
   }
 }
+
 
 function setRemoteStream(event) {
   console.log('Setting remote stream:', event.streams[0]);
   remoteVideoComponent.srcObject = event.streams[0];
   remoteStream = event.stream;
+
+  console.log(remoteStream.getVideoTracks());
+
 }
+
 
 
 function sendIceCandidate(event) {

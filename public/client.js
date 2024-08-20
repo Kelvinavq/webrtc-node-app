@@ -104,6 +104,7 @@ socket.on('webrtc_answer', (event) => {
   peerConnections[userId].setRemoteDescription(new RTCSessionDescription(event.sdp))
 })
 
+
 socket.on('webrtc_ice_candidate', (event) => {
   console.log('Received webrtc_ice_candidate:', event)
   const { userId, candidate } = event
@@ -112,6 +113,7 @@ socket.on('webrtc_ice_candidate', (event) => {
     peerConnections[userId].addIceCandidate(rtcIceCandidate)
   }
 })
+
 
 async function createPeerConnection(userId) {
   const rtcPeerConnection = new RTCPeerConnection(iceServers)
@@ -129,6 +131,8 @@ async function createPeerConnection(userId) {
         remoteVideosContainer.appendChild(remoteVideo)
       }
       remoteVideo.srcObject = remoteStream
+    } else {
+      console.error('No remote stream found in ontrack event')
     }
   }
 
@@ -185,6 +189,7 @@ async function createAnswer(rtcPeerConnection, userId) {
   }
 }
 
+
 async function setLocalStream(mediaConstraints) {
   try {
     localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints)
@@ -194,6 +199,7 @@ async function setLocalStream(mediaConstraints) {
     console.error('Could not get user media', error)
   }
 }
+
 
 
 

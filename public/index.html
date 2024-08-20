@@ -54,11 +54,11 @@
       <button id="connect-button">CONNECT</button>
     </div>
 
-    <div id="video-chat-container" class="video-position" style="display: none">
-      <video id="local-video" autoplay="autoplay" muted="muted"></video>
-      <video id="remote-video" autoplay playsinline style="width: 100%; height: auto;"></video>
-
+    <div id="video-chat-container">
+      <video id="local-video" autoplay playsinline></video>
+      <div id="remote-videos-container"></div>
     </div>
+    
 
     <script src="/socket.io/socket.io.js"></script>
     <script type="text/javascript" src="client.js"></script>

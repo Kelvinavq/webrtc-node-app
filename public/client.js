@@ -71,7 +71,7 @@ socket.on('start_call', async () => {
 })
 
 socket.on('webrtc_offer', async (event) => {
-  console.log('Socket event callback: webrtc_offer')
+  console.log('Received webrtc_offer:', event);
 
   if (!isRoomCreator) {
     rtcPeerConnection = new RTCPeerConnection(iceServers)
@@ -84,13 +84,13 @@ socket.on('webrtc_offer', async (event) => {
 })
 
 socket.on('webrtc_answer', (event) => {
-  console.log('Socket event callback: webrtc_answer')
+  console.log('Received webrtc_answer:', event);
 
   rtcPeerConnection.setRemoteDescription(new RTCSessionDescription(event))
 })
 
 socket.on('webrtc_ice_candidate', (event) => {
-  console.log('Socket event callback: webrtc_ice_candidate')
+  console.log('Received webrtc_ice_candidate:', event);
 
   // ICE candidate configuration.
   const candidate = new RTCIceCandidate({
@@ -127,8 +127,8 @@ async function setLocalStream(mediaConstraints) {
 
 function addLocalTracks(rtcPeerConnection) {
   localStream.getTracks().forEach((track) => {
-    rtcPeerConnection.addTrack(track, localStream)
-  })
+    rtcPeerConnection.addTrack(track, localStream);
+  });
 }
 
 async function createOffer(rtcPeerConnection) {
@@ -162,16 +162,20 @@ async function createAnswer(rtcPeerConnection) {
 }
 
 function setRemoteStream(event) {
-  remoteVideoComponent.srcObject = event.streams[0]
-  remoteStream = event.stream
+  console.log('Setting remote stream:', event.streams[0]);
+  remoteVideoComponent.srcObject = event.streams[0];
+  remoteStream = event.stream;
 }
+
 
 function sendIceCandidate(event) {
   if (event.candidate) {
+    console.log('Sending ICE candidate:', event.candidate);
     socket.emit('webrtc_ice_candidate', {
       roomId,
       label: event.candidate.sdpMLineIndex,
       candidate: event.candidate.candidate,
-    })
+    });
   }
 }
+
